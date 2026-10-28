@@ -7,12 +7,20 @@
 <style>
   html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
   body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; height: 48px; z-index: 4;
+         display: flex; justify-content: center; gap: 8px; align-items: center;
+         padding-top: env(safe-area-inset-top); background: #111; }
+  #bar button { appearance: none; border: 1px solid rgba(255,255,255,.25); background: none;
+         color: rgba(255,255,255,.6); font: 600 13px/1 -apple-system, sans-serif; letter-spacing: .08em;
+         padding: 8px 18px; border-radius: 999px; cursor: pointer; }
+  #bar button.on { background: #fff; color: #111; border-color: #fff; }
   #stage { display: flex; align-items: center; justify-content: center;
-           width: 100vw; height: 100vh; height: 100dvh; box-sizing: border-box; padding: 24px; }
+           width: 100vw; height: 100vh; height: 100dvh; box-sizing: border-box; padding: 24px;
+           padding-top: calc(56px + env(safe-area-inset-top)); }
   #pg { display: block; max-width: 100%; max-height: 100%; background: #fff;
         box-shadow: 0 4px 24px rgba(0,0,0,.5); }
-  @media (max-width: 600px) { #stage { padding: 0; } }
-  .zone { position: fixed; top: 0; bottom: 0; width: 50%; cursor: pointer; z-index: 2; }
+  @media (max-width: 600px) { #stage { padding: calc(48px + env(safe-area-inset-top)) 0 0; } }
+  .zone { position: fixed; top: calc(48px + env(safe-area-inset-top)); bottom: 0; width: 50%; cursor: pointer; z-index: 2; }
   #prev { left: 0; } #next { right: 0; }
   .arrow { position: fixed; top: 50%; transform: translateY(-50%); z-index: 3; pointer-events: none;
            color: rgba(255,255,255,.35); font: 32px/1 sans-serif; padding: 0 12px; }
@@ -23,25 +31,35 @@
 </style>
 </head>
 <body>
+<div id="bar"><button data-k="lyrics">LYRICS</button><button data-k="tab">TAB</button></div>
 <div id="stage"><img id="pg" alt=""></div>
 <div class="zone" id="prev"></div><div class="zone" id="next"></div>
 <div class="arrow" id="aprev">‹</div><div class="arrow" id="anext">›</div>
 <div id="num"></div>
 <script>
-const N = 9;
-const src = n => 'pages/p-' + n + '.jpg';
+const BOOKS = {
+  lyrics: { n: 1, src: i => 'lyrics/p-' + i + '.jpg' },
+  tab:    { n: 9, src: i => 'pages/p-' + i + '.jpg' },
+};
 const img = document.getElementById('pg'), numEl = document.getElementById('num');
-const preload = [];
-for (let i = 1; i <= N; i++) { const im = new Image(); im.src = src(i); preload.push(im); }
-let page = Math.min(N, Math.max(1, parseInt(location.hash.slice(1)) || 1));
+for (const k in BOOKS) for (let i = 1; i <= BOOKS[k].n; i++) new Image().src = BOOKS[k].src(i);
+
+const m = location.hash.match(/^#(lyrics|tab)(?:-(\d+))?$/);
+let book = m ? m[1] : 'lyrics';
+let page = m && m[2] ? Math.min(BOOKS[book].n, Math.max(1, +m[2])) : 1;
+const N = () => BOOKS[book].n;
 
 function show() {
-  img.src = src(page);
-  numEl.textContent = page + ' / ' + N;
-  history.replaceState(null, '', '#' + page);
+  img.src = BOOKS[book].src(page);
+  numEl.textContent = N() > 1 ? page + ' / ' + N() : '';
+  document.querySelectorAll('#bar button').forEach(b => b.classList.toggle('on', b.dataset.k === book));
+  history.replaceState(null, '', '#' + book + (page > 1 ? '-' + page : ''));
 }
+document.querySelectorAll('#bar button').forEach(b => b.onclick = () => {
+  if (b.dataset.k !== book) { book = b.dataset.k; page = 1; show(); }
+});
 function go(d) {
-  const n = Math.min(N, Math.max(1, page + d));
+  const n = Math.min(N(), Math.max(1, page + d));
   if (n !== page) { page = n; show(); }
 }
 
