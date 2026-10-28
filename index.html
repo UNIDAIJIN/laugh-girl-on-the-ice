@@ -6,11 +6,12 @@
 <title>laugh girl on the ice, riff boy in the shell</title>
 <style>
   html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
-  body { display: flex; align-items: center; justify-content: center;
-         -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
-  #stage { position: relative; display: flex; align-items: center; justify-content: center;
-           width: 100vw; height: 100vh; height: 100dvh; }
-  canvas { display: block; box-shadow: 0 4px 24px rgba(0,0,0,.5); background: #fff; }
+  body { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #stage { display: flex; align-items: center; justify-content: center;
+           width: 100vw; height: 100vh; height: 100dvh; box-sizing: border-box; padding: 24px; }
+  #pg { display: block; max-width: 100%; max-height: 100%; background: #fff;
+        box-shadow: 0 4px 24px rgba(0,0,0,.5); }
+  @media (max-width: 600px) { #stage { padding: 0; } }
   .zone { position: fixed; top: 0; bottom: 0; width: 50%; cursor: pointer; z-index: 2; }
   #prev { left: 0; } #next { right: 0; }
   .arrow { position: fixed; top: 50%; transform: translateY(-50%); z-index: 3; pointer-events: none;
@@ -18,55 +19,30 @@
   #aprev { left: 0; } #anext { right: 0; }
   #num { position: fixed; bottom: calc(10px + env(safe-area-inset-bottom)); left: 0; right: 0; text-align: center;
          color: rgba(255,255,255,.6); font: 13px/1 -apple-system, sans-serif; z-index: 3; pointer-events: none; }
-  #loading { color: #888; font: 14px sans-serif; }
   @media (hover: none) { .arrow { display: none; } }
 </style>
 </head>
 <body>
-<div id="stage"><div id="loading">loading…</div><canvas id="c" hidden></canvas></div>
+<div id="stage"><img id="pg" alt=""></div>
 <div class="zone" id="prev"></div><div class="zone" id="next"></div>
 <div class="arrow" id="aprev">‹</div><div class="arrow" id="anext">›</div>
 <div id="num"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
-const numEl = document.getElementById('num');
-let pdf, page = 1, task = null;
-const cache = {};
+const N = 9;
+const src = n => 'pages/p-' + n + '.jpg';
+const img = document.getElementById('pg'), numEl = document.getElementById('num');
+const preload = [];
+for (let i = 1; i <= N; i++) { const im = new Image(); im.src = src(i); preload.push(im); }
+let page = Math.min(N, Math.max(1, parseInt(location.hash.slice(1)) || 1));
 
-const getPage = n => cache[n] || (cache[n] = pdf.getPage(n));
-
-async function render() {
-  const n = page;
-  const p = await getPage(n);
-  if (n !== page) return;
-  const base = p.getViewport({ scale: 1 });
-  const margin = innerWidth < 600 ? 0 : 24;
-  const scale = Math.min((innerWidth - margin * 2) / base.width, (innerHeight - margin * 2) / base.height);
-  const dpr = window.devicePixelRatio || 1;
-  const vp = p.getViewport({ scale: scale * dpr });
-  if (task) task.cancel();
-  const off = document.createElement('canvas');
-  off.width = vp.width; off.height = vp.height;
-  task = p.render({ canvasContext: off.getContext('2d'), viewport: vp });
-  try { await task.promise; } catch (e) { return; }
-  if (n !== page) return;
-  canvas.width = off.width; canvas.height = off.height;
-  canvas.style.width = Math.floor(base.width * scale) + 'px';
-  canvas.style.height = Math.floor(base.height * scale) + 'px';
-  ctx.drawImage(off, 0, 0);
-  canvas.hidden = false;
-  document.getElementById('loading').hidden = true;
-  numEl.textContent = page + ' / ' + pdf.numPages;
-  if (page < pdf.numPages) getPage(page + 1);
-  if (page > 1) getPage(page - 1);
+function show() {
+  img.src = src(page);
+  numEl.textContent = page + ' / ' + N;
   history.replaceState(null, '', '#' + page);
 }
-
 function go(d) {
-  const n = Math.min(pdf.numPages, Math.max(1, page + d));
-  if (n !== page) { page = n; render(); }
+  const n = Math.min(N, Math.max(1, page + d));
+  if (n !== page) { page = n; show(); }
 }
 
 document.getElementById('prev').onclick = () => go(-1);
@@ -82,13 +58,7 @@ addEventListener('touchend', e => {
   const dx = e.changedTouches[0].clientX - sx; sx = null;
   if (Math.abs(dx) > 50) { e.preventDefault(); go(dx < 0 ? 1 : -1); }
 });
-let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(render, 150); });
-
-pdfjsLib.getDocument('book.pdf').promise.then(d => {
-  pdf = d;
-  page = Math.min(pdf.numPages, Math.max(1, parseInt(location.hash.slice(1)) || 1));
-  render();
-});
+show();
 </script>
 </body>
 </html>
